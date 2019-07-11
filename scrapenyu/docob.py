@@ -1,11 +1,12 @@
 from bs4 import BeautifulSoup
 import re
 import requests
-
+import csv
 
 class Doctor:
-    def __init__(self, npi):
+    def __init__(self, npi, cigna_name):
         self.npi = npi
+        self.cigna_name = cigna_name
         self.name = None
         self.middle_initial = None
         self.first = None
@@ -56,29 +57,35 @@ class Doctor:
             edu = credentials.find(string = re.compile("Education and Training"))
             if edu:
                 edu = edu.parent.parent.find_all("li")
-            for school in edu: 
-                self.education.append(school.string.strip())
+                for school in edu: 
+                    self.education.append(school.string.strip())
 
     def update_photo(self):
         #Grab photo URL from HTML data
-        photo = self.soup.find(class_="parallax")
+        photo = self.soup.find(class_ = "square doctor-image")
         if photo:
-            photo = str(photo["style"])
-            photo = (photo[photo.find("url") + 4:len(photo)-1])
-            self.headshot = photo
+            photo = photo.img["src"]
+            self.headshot = "https://nyulangone.org" + str(photo)
+        else:
+            photo = self.soup.find(class_="parallax")
+            if photo:
+                photo = str(photo["style"])
+                photo = (photo[photo.find("url") + 4:len(photo)-1])
+                self.headshot = photo
 
     def update_location(self):
         #Get locations
         locations = self.soup.find_all(class_ = "trigger location-address")
         for place in locations:
-            p1 = ""
-            location = place.p.text.split("\n")
-            for line in location:
-                line = line.strip()
-                line = line.strip()
-                p1 += str(line)
-                p1 += "\n"
-            self.address_list.append(p1.strip())
+            if place.p:
+                p1 = ""
+                location = place.p.text.split("\n")
+                for line in location:
+                    line = line.strip()
+                    line = line.strip()
+                    p1 += str(line)
+                    p1 += "\n"
+                self.address_list.append(p1.strip())
 
     def update(self):
         self.check_in_dir()
@@ -87,6 +94,25 @@ class Doctor:
         self.update_photo()
         self.update_location()
 
-    def write_csv_line(self, f):
+
+    def write_csv(self, f):
         #write a single line to the csv flile
-        pass
+        edu = ""
+        for entry in self.education:
+            edu += str(entry) +"\n"
+        addy = ""
+        for entry in self.address_list:
+            addy += str(entry) +"\n"
+        to_write = [self.npi, self.cigna_name, self.name, self.profile_link, self.in_directory, self.headshot, edu.strip(), addy.strip()]
+        with open(str(f)+".csv", 'a') as csvfile:
+            fil = csv.writer(csvfile)
+            fil.writerow(to_write)
+        csvfile.close()
+
+def create_csv(f):
+        fil = open(str(f)+".csv", "w")
+        to_write = ["NPI","Name in Portal","Provider Name", "Profile Link", "In Directory", "Headshot Link", "Education", "Locations"]
+        with open(str(f)+".csv", 'w') as csvfile:
+            fil = csv.writer(csvfile)
+            fil.writerow(to_write)
+        csvfile.close()
